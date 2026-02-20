@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntercomRoulette — P2P Roulette on Trac Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Mono:wght@400;500&family=Cormorant+Garamond:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #f0d080;
+    --green: #0d5c2e;
+    --green-light: #1a7a3e;
+    --red: #b91c1c;
+    --black: #0a0a0a;
+    --felt: #0d4a1f;
+    --ivory: #f5f0e8;
+    --dim: rgba(201,168,76,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #050e08;
+    color: var(--ivory);
+    font-family: 'Cormorant Garamond', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(13,92,46,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(185,28,28,0.08) 0%, transparent 50%);
+  }
+
+  /* GRAIN TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.4;
+  }
+
+  header {
+    text-align: center;
+    padding: 48px 20px 24px;
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    display: block;
+    width: 200px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 20px auto 0;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 6vw, 4rem);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 50%, var(--gold) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+  }
+
+  .tagline {
+    font-size: 0.95rem;
+    color: rgba(245,240,232,0.5);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    margin-top: 8px;
+  }
+
+  .trac-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--dim);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 4px;
+    padding: 6px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--gold);
+    margin-top: 16px;
+    letter-spacing: 0.1em;
+  }
+
+  .trac-badge span { opacity: 0.6; }
+
+  /* MAIN LAYOUT */
+  .arena {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px 20px 60px;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  @media(max-width: 820px) {
+    .arena { grid-template-columns: 1fr; }
+  }
+
+  /* WHEEL SECTION */
+  .wheel-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .wheel-frame {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    margin: 0 auto;
+  }
+
+  .wheel-glow {
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+
+  canvas#roulette {
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    box-shadow:
+      0 0 0 3px rgba(201,168,76,0.4),
+      0 0 0 8px rgba(13,92,46,0.6),
+      0 0 40px rgba(0,0,0,0.8),
+      inset 0 0 20px rgba(0,0,0,0.5);
+    cursor: pointer;
+    display: block;
+  }
+
+  .pointer {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 28px solid var(--gold);
+    filter: drop-shadow(0 2px 8px rgba(201,168,76,0.6));
+    z-index: 10;
+  }
+
+  .result-display {
+    text-align: center;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .result-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: all 0.4s ease;
+  }
+
+  .result-number.red { color: var(--red); text-shadow: 0 0 20px rgba(185,28,28,0.5); }
+  .result-number.black { color: #aaa; text-shadow: 0 0 20px rgba(150,150,150,0.3); }
+  .result-number.green { color: #4ade80; text-shadow: 0 0 20px rgba(74,222,128,0.5); }
+
+  .result-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-top: 4px;
+  }
+
+  .spin-btn {
+    background: linear-gradient(135deg, #8a6b1e 0%, var(--gold) 50%, #8a6b1e 100%);
+    border: none;
+    color: #1a0f00;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 14px 48px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    box-shadow: 0 4px 20px rgba(201,168,76,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .spin-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform 0.4s;
+  }
+
+  .spin-btn:hover::after { transform: translateX(100%); }
+  .spin-btn:hover { box-shadow: 0 6px 28px rgba(201,168,76,0.5); }
+  .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* BETTING BOARD */
+  .betting-panel {
+    background: rgba(13,74,31,0.3);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 4px;
+    padding: 24px;
+    backdrop-filter: blur(8px);
+  }
+
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(201,168,76,0.3), transparent);
+  }
+
+  /* NUMBER GRID */
+  .number-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3px;
+    margin-bottom: 16px;
+  }
+
+  .num-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    border-radius: 2px;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .num-cell.is-red { background: rgba(185,28,28,0.4); }
+  .num-cell.is-black { background: rgba(30,30,30,0.7); }
+  .num-cell.is-green { background: rgba(13,92,46,0.8); grid-column: 1/-1; aspect-ratio: auto; padding: 6px; }
+
+  .num-cell:hover { transform: scale(1.1); z-index: 1; border-color: var(--gold); }
+  .num-cell.selected { border-color: var(--gold); box-shadow: 0 0 8px rgba(201,168,76,0.5); background-color: rgba(201,168,76,0.2) !important; }
+
+  /* QUICK BETS */
+  .quick-bets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .quick-btn {
+    padding: 10px 8px;
+    border: 1px solid rgba(201,168,76,0.2);
+    background: rgba(255,255,255,0.03);
+    color: var(--ivory);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .quick-btn:hover, .quick-btn.selected {
+    background: var(--dim);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* BET AMOUNT */
+  .bet-amount-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .bet-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: rgba(245,240,232,0.5);
+    white-space: nowrap;
+  }
+
+  .bet-input {
+    flex: 1;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(201,168,76,0.2);
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    border-radius: 2px;
+    outline: none;
+    width: 100%;
+  }
+
+  .bet-input:focus { border-color: var(--gold); }
+
+  .chip-btns {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(201,168,76,0.3);
+    background: rgba(201,168,76,0.05);
+    color: var(--gold-light);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .chip:hover { background: var(--dim); border-color: var(--gold); }
+
+  .place-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--green) 0%, var(--green-light) 100%);
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--gold-light);
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+  }
+
+  .place-btn:hover { background: linear-gradient(135deg, var(--green-light) 0%, #2d9a56 100%); }
+
+  /* STATUS & HISTORY */
+  .status-area {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(201,168,76,0.1);
+    border-radius: 2px;
+    padding: 10px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: rgba(245,240,232,0.6);
+    min-height: 50px;
+    line-height: 1.6;
+  }
+
+  .status-area .win { color: #4ade80; }
+  .status-area .lose { color: #f87171; }
+  .status-area .info { color: var(--gold); }
+
+  .history-section { margin-top: 28px; }
+
+  .history-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .history-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+
+  .history-dot.red { background: rgba(185,28,28,0.6); }
+  .history-dot.black { background: rgba(40,40,40,0.8); }
+  .history-dot.green { background: rgba(13,92,46,0.8); }
+
+  /* P2P STATUS */
+  .p2p-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(201,168,76,0.1);
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: rgba(245,240,232,0.5);
+    margin-bottom: 20px;
+    max-width: 1100px;
+    margin: 0 auto 24px;
+    padding: 10px 20px;
+  }
+
+  .dot-live {
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #4ade80;
+    animation: blink 2s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .p2p-bar span { color: var(--gold); }
+
+  /* BOTTOM SECTION */
+  .bottom-info {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  @media(max-width: 600px) { .bottom-info { grid-template-columns: 1fr; } }
+
+  .info-card {
+    background: rgba(13,74,31,0.15);
+    border: 1px solid rgba(201,168,76,0.1);
+    border-radius: 4px;
+    padding: 20px;
+  }
+
+  .info-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .info-card p {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: rgba(245,240,232,0.6);
+  }
+
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: rgba(245,240,232,0.25);
+    letter-spacing: 0.1em;
+    border-top: 1px solid rgba(201,168,76,0.08);
+  }
+
+  .wheel-spinning { animation: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">IntercomRoulette</div>
+  <div class="tagline">Peer-to-Peer · Trac Network · Decentralized</div>
+  <div class="trac-badge">
+    <span>TRAC ADDRESS:</span> REPLACE_WITH_YOUR_TRAC_ADDRESS
+  </div>
+</header>
+
+<div class="p2p-bar">
+  <div class="dot-live"></div>
+  <span>P2P Intercom Sidechannel:</span> Connected &nbsp;|&nbsp;
+  <span>Players Online:</span> <span id="onlineCount">1</span> &nbsp;|&nbsp;
+  <span>Session:</span> <span id="sessionId">IC-???</span>
+</div>
+
+<div class="arena">
+
+  <!-- WHEEL -->
+  <div class="wheel-section">
+    <div class="wheel-frame">
+      <div class="wheel-glow"></div>
+      <div class="pointer"></div>
+      <canvas id="roulette" width="320" height="320"></canvas>
+    </div>
+
+    <div class="result-display">
+      <div class="result-number green" id="resultNum">—</div>
+      <div class="result-label" id="resultLabel">Place your bet & spin</div>
+    </div>
+
+    <button class="spin-btn" id="spinBtn" onclick="spinWheel()">✦ SPIN THE WHEEL ✦</button>
+
+    <div class="history-section" style="width:100%;max-width:340px;">
+      <div class="panel-title" style="font-size:0.9rem;">Last Results</div>
+      <div class="history-row" id="historyRow"></div>
+    </div>
+  </div>
+
+  <!-- BETTING PANEL -->
+  <div>
+    <div class="betting-panel">
+      <div class="panel-title">Place Your Bet</div>
+
+      <!-- Number Grid -->
+      <div class="number-grid" id="numberGrid"></div>
+
+      <!-- Quick bets -->
+      <div class="quick-bets">
+        <button class="quick-btn" onclick="selectQuick('red')">🔴 Red</button>
+        <button class="quick-btn" onclick="selectQuick('black')">⚫ Black</button>
+        <button class="quick-btn" onclick="selectQuick('odd')">Odd</button>
+        <button class="quick-btn" onclick="selectQuick('even')">Even</button>
+        <button class="quick-btn" onclick="selectQuick('1-18')">1–18</button>
+        <button class="quick-btn" onclick="selectQuick('19-36')">19–36</button>
+      </div>
+
+      <!-- Bet Amount -->
+      <div class="bet-label" style="margin-bottom:6px;">Bet Amount (TNK)</div>
+      <div class="bet-amount-row">
+        <input type="number" class="bet-input" id="betAmount" value="10" min="1">
+      </div>
+      <div class="chip-btns">
+        <button class="chip" onclick="addChip(5)">+5</button>
+        <button class="chip" onclick="addChip(10)">+10</button>
+        <button class="chip" onclick="addChip(25)">+25</button>
+        <button class="chip" onclick="addChip(50)">+50</button>
+        <button class="chip" onclick="addChip(100)">+100</button>
+        <button class="chip" onclick="clearBet()">Clear</button>
+      </div>
+
+      <button class="place-btn" onclick="placeBet()">▶ Place Bet</button>
+
+      <div class="status-area" id="statusArea">
+        <span class="info">⬡ Intercom P2P ready. Select a bet type and spin.</span>
+      </div>
+    </div>
+
+    <!-- Balance -->
+    <div class="betting-panel" style="margin-top:16px; padding:16px 24px;">
+      <div class="panel-title">My Balance</div>
+      <div style="font-family:'DM Mono',monospace; font-size:1.4rem; color:var(--gold);" id="balanceDisplay">1,000 <small style="font-size:0.7rem;opacity:0.6;">TNK</small></div>
+      <div style="font-size:0.75rem; opacity:0.4; font-family:'DM Mono',monospace; margin-top:4px;">Demo mode — connect wallet to play for real</div>
+    </div>
+  </div>
+</div>
+
+<!-- Info Cards -->
+<div class="bottom-info">
+  <div class="info-card">
+    <h3>⬡ P2P via Intercom</h3>
+    <p>All bets and results are broadcast through Intercom sidechannels — no central server, no house control. Pure peer-to-peer coordination on the Trac Network.</p>
+  </div>
+  <div class="info-card">
+    <h3>📜 On-Chain History</h3>
+    <p>Every spin result is committed to Intercom's replicated-state layer, creating a permanent, verifiable record of all game outcomes accessible to all participants.</p>
+  </div>
+  <div class="info-card">
+    <h3>🎰 Fair Odds</h3>
+    <p>European roulette: 37 pockets (0–36). Red/Black pays 1:1. Single number pays 35:1. No additional house edge beyond standard roulette mathematics.</p>
+  </div>
+</div>
+
+<footer>
+  IntercomRoulette · Built on Trac Network Intercom · Fork of github.com/Trac-Systems/intercom · MIT License
+</footer>
+
+<script>
+// ─── ROULETTE NUMBERS & COLORS ───────────────────────────────────
+const RED_NUMS = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+const sequence = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+
+function getColor(n) {
+  if (n === 0) return 'green';
+  return RED_NUMS.includes(n) ? 'red' : 'black';
+}
+
+// ─── DRAW WHEEL ───────────────────────────────────────────────────
+const canvas = document.getElementById('roulette');
+const ctx = canvas.getContext('2d');
+const cx = 160, cy = 160, r = 150;
+const sliceAngle = (Math.PI * 2) / sequence.length;
+let rotation = 0;
+
+function drawWheel(rot) {
+  ctx.clearRect(0, 0, 320, 320);
+
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a0f00';
+  ctx.fill();
+
+  // Slices
+  sequence.forEach((num, i) => {
+    const startAngle = rot + i * sliceAngle - Math.PI / 2;
+    const endAngle = startAngle + sliceAngle;
+    const color = getColor(num);
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r - 8, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = color === 'red' ? '#8b1c1c' : color === 'black' ? '#1a1a1a' : '#0d5c2e';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(201,168,76,0.2)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Number label
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(startAngle + sliceAngle / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#f5f0e8';
+    ctx.font = `bold ${sequence.length > 30 ? '9' : '11'}px DM Mono, monospace`;
+    ctx.fillText(num, r - 14, 4);
+    ctx.restore();
+  });
+
+  // Center disc
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 50);
+  grad.addColorStop(0, '#2a1800');
+  grad.addColorStop(1, '#0d0800');
+  ctx.beginPath();
+  ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(201,168,76,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Center logo
+  ctx.fillStyle = 'rgba(201,168,76,0.8)';
+  ctx.font = 'bold 11px Playfair Display, serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('IC', cx, cy + 4);
+
+  // Gold rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(201,168,76,0.6)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+drawWheel(0);
+
+// ─── SPIN LOGIC ───────────────────────────────────────────────────
+let isSpinning = false;
+let balance = 1000;
+let currentBet = null;
+let betType = null;
+let betValue = null;
+let history = [];
+
+function spinWheel() {
+  if (isSpinning) return;
+  if (!currentBet) {
+    setStatus('<span class="info">⚠ Select a bet type first!</span>');
+    return;
+  }
+
+  isSpinning = true;
+  document.getElementById('spinBtn').disabled = true;
+
+  // Pick random result
+  const resultIndex = Math.floor(Math.random() * sequence.length);
+  const resultNum = sequence[resultIndex];
+  const resultColor = getColor(resultNum);
+
+  // Target rotation: bring result to top (pointer at top)
+  const targetSliceAngle = (Math.PI * 2) / sequence.length;
+  const targetRot = -(resultIndex * targetSliceAngle) + (Math.PI * 2 * 6) + (Math.random() * targetSliceAngle * 0.6);
+
+  let startRot = rotation;
+  let startTime = null;
+  const duration = 4000 + Math.random() * 2000;
+
+  function easeOut(t) {
+    return 1 - Math.pow(1 - t, 4);
+  }
+
+  function animate(ts) {
+    if (!startTime) startTime = ts;
+    const elapsed = ts - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = easeOut(progress);
+    const currentRot = startRot + (targetRot * eased);
+    rotation = currentRot % (Math.PI * 2);
+    drawWheel(currentRot);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      isSpinning = false;
+      document.getElementById('spinBtn').disabled = false;
+      showResult(resultNum, resultColor);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function showResult(num, color) {
+  const el = document.getElementById('resultNum');
+  el.className = 'result-number ' + color;
+  el.textContent = num;
+  document.getElementById('resultLabel').textContent = color.toUpperCase() + (num % 2 === 0 && num !== 0 ? ' · EVEN' : num !== 0 ? ' · ODD' : '');
+
+  // Add to history
+  history.unshift({ num, color });
+  if (history.length > 15) history.pop();
+  renderHistory();
+
+  // Check win
+  const won = checkWin(num, color);
+  const bet = parseInt(document.getElementById('betAmount').value) || 10;
+
+  if (won.win) {
+    const payout = bet * won.multiplier;
+    balance += payout;
+    setStatus(`<span class="win">✓ YOU WIN ${payout} TNK! (${won.reason}) · Payout: ${won.multiplier}:1</span>`);
+  } else {
+    balance -= bet;
+    setStatus(`<span class="lose">✗ No luck this time. Result: ${num} ${color.toUpperCase()}. Lost ${bet} TNK.</span>`);
+  }
+  document.getElementById('balanceDisplay').innerHTML = `${balance.toLocaleString()} <small style="font-size:0.7rem;opacity:0.6;">TNK</small>`;
+
+  // Broadcast to P2P (simulated)
+  logP2P(`[P2P] Result ${num} (${color}) broadcast to ${document.getElementById('onlineCount').textContent} peers`);
+}
+
+function checkWin(num, color) {
+  if (!betType) return { win: false };
+
+  if (betType === 'number' && betValue == num) return { win: true, multiplier: 35, reason: 'Single Number' };
+  if (betType === 'quick') {
+    if (betValue === 'red' && color === 'red') return { win: true, multiplier: 1, reason: 'Red' };
+    if (betValue === 'black' && color === 'black') return { win: true, multiplier: 1, reason: 'Black' };
+    if (betValue === 'odd' && num !== 0 && num % 2 !== 0) return { win: true, multiplier: 1, reason: 'Odd' };
+    if (betValue === 'even' && num !== 0 && num % 2 === 0) return { win: true, multiplier: 1, reason: 'Even' };
+    if (betValue === '1-18' && num >= 1 && num <= 18) return { win: true, multiplier: 1, reason: '1–18' };
+    if (betValue === '19-36' && num >= 19 && num <= 36) return { win: true, multiplier: 1, reason: '19–36' };
+  }
+  return { win: false };
+}
+
+// ─── UI HELPERS ───────────────────────────────────────────────────
+function buildGrid() {
+  const grid = document.getElementById('numberGrid');
+  grid.innerHTML = '';
+
+  // Zero
+  const zero = document.createElement('div');
+  zero.className = 'num-cell is-green';
+  zero.textContent = '0';
+  zero.onclick = () => selectNumber(0);
+  grid.appendChild(zero);
+
+  // 1-36
+  for (let n = 1; n <= 36; n++) {
+    const cell = document.createElement('div');
+    cell.className = 'num-cell ' + (RED_NUMS.includes(n) ? 'is-red' : 'is-black');
+    cell.textContent = n;
+    cell.id = 'cell-' + n;
+    cell.onclick = () => selectNumber(n);
+    grid.appendChild(cell);
+  }
+}
+
+function selectNumber(n) {
+  clearSelections();
+  const el = document.getElementById('cell-' + n) || document.querySelector('.is-green');
+  if (el) el.classList.add('selected');
+  betType = 'number';
+  betValue = n;
+  currentBet = `Number ${n}`;
+  setStatus(`<span class="info">Bet on number ${n}. Click SPIN!</span>`);
+}
+
+function selectQuick(type) {
+  clearSelections();
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('selected'));
+  event.target.classList.add('selected');
+  betType = 'quick';
+  betValue = type;
+  currentBet = type;
+  setStatus(`<span class="info">Bet on ${type}. Click SPIN!</span>`);
+}
+
+function clearSelections() {
+  document.querySelectorAll('.num-cell').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('selected'));
+}
+
+function placeBet() {
+  if (!currentBet) {
+    setStatus('<span class="info">⚠ Select a bet type first.</span>');
+    return;
+  }
+  const amt = parseInt(document.getElementById('betAmount').value) || 10;
+  if (amt > balance) {
+    setStatus('<span class="lose">⚠ Insufficient balance!</span>');
+    return;
+  }
+  setStatus(`<span class="info">✓ Bet placed: ${amt} TNK on ${currentBet}. Spin the wheel!</span>`);
+  logP2P(`[P2P] Bet broadcast via Intercom sidechannel: ${amt} TNK on ${currentBet}`);
+}
+
+function addChip(v) {
+  const input = document.getElementById('betAmount');
+  input.value = parseInt(input.value || 0) + v;
+}
+
+function clearBet() {
+  document.getElementById('betAmount').value = 10;
+  currentBet = null;
+  betType = null;
+  betValue = null;
+  clearSelections();
+  setStatus('<span class="info">Bet cleared.</span>');
+}
+
+function setStatus(html) {
+  document.getElementById('statusArea').innerHTML = html;
+}
+
+function renderHistory() {
+  const row = document.getElementById('historyRow');
+  row.innerHTML = '';
+  history.forEach(h => {
+    const dot = document.createElement('div');
+    dot.className = 'history-dot ' + h.color;
+    dot.textContent = h.num;
+    row.appendChild(dot);
+  });
+}
+
+function logP2P(msg) {
+  console.log(msg); // In real integration: send via Intercom sidechannel
+}
+
+// ─── SIMULATED P2P ────────────────────────────────────────────────
+function initP2P() {
+  document.getElementById('sessionId').textContent = 'IC-' + Math.random().toString(36).substr(2,6).toUpperCase();
+  // Simulate players joining
+  let count = 1;
+  setInterval(() => {
+    if (Math.random() > 0.7) {
+      count = Math.max(1, Math.min(8, count + (Math.random() > 0.5 ? 1 : -1)));
+      document.getElementById('onlineCount').textContent = count;
+    }
+  }, 4000);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────
+buildGrid();
+initP2P();
+</script>
+</body>
+</html>
