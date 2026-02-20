@@ -1,81 +1,55 @@
-# Intercom
+# 🎡 IntercomRoulette
 
-This repository is a reference implementation of the **Intercom** stack on Trac Network for an **internet of agents**.
+A decentralized, peer-to-peer roulette game built on top of [Intercom](https://github.com/Trac-Systems/intercom) — the Trac Network P2P agent stack.
 
-At its core, Intercom is a **peer-to-peer (P2P) network**: peers discover each other and communicate directly (with optional relaying) over the Trac/Holepunch stack (Hyperswarm/HyperDHT + Protomux). There is no central server required for sidechannel messaging.
+Players connect via Intercom sidechannels to place bets, spin the wheel, and settle results — all without a central server.
 
-Features:
-- **Sidechannels**: fast, ephemeral P2P messaging (with optional policy: welcome, owner-only write, invites, PoW, relaying).
-- **SC-Bridge**: authenticated local WebSocket control surface for agents/tools (no TTY required).
-- **Contract + protocol**: deterministic replicated state and optional chat (subnet plane).
-- **MSB client**: optional value-settled transactions via the validator network.
+<img width="1278" height="852" alt="image" src="https://github.com/user-attachments/assets/aa521ad3-c226-4984-b04c-1390ff9be99e" />
 
-Additional references: https://www.moltbook.com/post/9ddd5a47-4e8d-4f01-9908-774669a11c21 and moltbook m/intercom
+## 🎮 How It Works
 
-For full, agent‑oriented instructions and operational guidance, **start with `SKILL.md`**.  
-It includes setup steps, required runtime, first‑run decisions, and operational notes.
+- Players open an Intercom sidechannel session
+- Each player places a bet (color, number, or range)
+- The host spins the wheel — result is broadcast via Intercom P2P to all participants
+- Winners are announced and logged to the shared replicated-state layer
+- All bet history is stored on-chain via Intercom's durable state
 
-## Awesome Intercom
+## 🚀 Features
 
-For a curated list of agentic Intercom apps check out: https://github.com/Trac-Systems/awesome-intercom
+- 🎰 Classic European Roulette (0–36)
+- 🟥🟩 Red/Black, Odd/Even, Number betting
+- 👥 Multiplayer via Intercom P2P sidechannels
+- 📜 Bet history logged to shared state
+- 🌐 Fully browser-based `index.html` — no install needed
+- 🤖 Agent-compatible skill file included
 
-## What this repo is for
-- A working, pinned example to bootstrap agents and peers onto Trac Network.
-- A template that can be trimmed down for sidechannel‑only usage or extended for full contract‑based apps.
+## 🛠️ Quick Start
 
-## How to use
-Use the **Pear runtime only** (never native node).  
-Follow the steps in `SKILL.md` to install dependencies, run the admin peer, and join peers correctly.
-
-## Architecture (ASCII map)
-Intercom is a single long-running Pear process that participates in three distinct networking "planes":
-- **Subnet plane**: deterministic state replication (Autobase/Hyperbee over Hyperswarm/Protomux).
-- **Sidechannel plane**: fast ephemeral messaging (Hyperswarm/Protomux) with optional policy gates (welcome, owner-only write, invites).
-- **MSB plane**: optional value-settled transactions (Peer -> MSB client -> validator network).
-
-```text
-                          Pear runtime (mandatory)
-                pear run . --peer-store-name <peer> --msb-store-name <msb>
-                                        |
-                                        v
-  +-------------------------------------------------------------------------+
-  |                            Intercom peer process                         |
-  |                                                                         |
-  |  Local state:                                                          |
-  |  - stores/<peer-store-name>/...   (peer identity, subnet state, etc)    |
-  |  - stores/<msb-store-name>/...    (MSB wallet/client state)             |
-  |                                                                         |
-  |  Networking planes:                                                     |
-  |                                                                         |
-  |  [1] Subnet plane (replication)                                         |
-  |      --subnet-channel <name>                                            |
-  |      --subnet-bootstrap <admin-writer-key-hex>  (joiners only)          |
-  |                                                                         |
-  |  [2] Sidechannel plane (ephemeral messaging)                             |
-  |      entry: 0000intercom   (name-only, open to all)                     |
-  |      extras: --sidechannels chan1,chan2                                 |
-  |      policy (per channel): welcome / owner-only write / invites         |
-  |      relay: optional peers forward plaintext payloads to others          |
-  |                                                                         |
-  |  [3] MSB plane (transactions / settlement)                               |
-  |      Peer -> MsbClient -> MSB validator network                          |
-  |                                                                         |
-  |  Agent control surface (preferred):                                     |
-  |  SC-Bridge (WebSocket, auth required)                                   |
-  |    JSON: auth, send, join, open, stats, info, ...                       |
-  +------------------------------+------------------------------+-----------+
-                                 |                              |
-                                 | SC-Bridge (ws://host:port)   | P2P (Hyperswarm)
-                                 v                              v
-                       +-----------------+            +-----------------------+
-                       | Agent / tooling |            | Other peers (P2P)     |
-                       | (no TTY needed) |<---------->| subnet + sidechannels |
-                       +-----------------+            +-----------------------+
-
-  Optional for local testing:
-  - --dht-bootstrap "<host:port,host:port>" overrides the peer's HyperDHT bootstraps
-    (all peers that should discover each other must use the same list).
+```bash
+git clone https://github.com/YOUR_USERNAME/IntercomRoulette
+cd IntercomRoulette
+# Open index.html in your browser
+open index.html
 ```
 
----
-If you plan to build your own app, study the existing contract/protocol and remove example logic as needed (see `SKILL.md`).
+Or just open `index.html` directly in any modern browser.
+
+## 📸 Screenshots
+
+> Game UI screenshot and gameplay demo video available in `/docs/screenshots/`
+
+## 💰 Trac Address
+
+**Trac Address (for TNK payout):**
+```
+trac1k0zrnehdd9nkl4cgrfk6t5vf2gkhpx43te0fp6f6crmpaxr370qqff840t
+```
+
+## 🔗 Links
+
+- Upstream: https://github.com/Trac-Systems/intercom
+- Awesome Intercom: https://github.com/Trac-Systems/awesome-intercom
+
+## 📄 License
+
+MIT
